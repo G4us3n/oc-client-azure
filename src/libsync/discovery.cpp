@@ -594,6 +594,70 @@ void ProcessDirectoryJob::processFileAnalyzeRemoteInfo(
     processFileAnalyzeLocalInfo(item, path, localEntry, serverEntry, dbEntry, _queryServer);
 }
 
+bool ProcessDirectoryJob::isMove(
+    const OCC::SyncJournalFileRecord &base, const LocalInfo &localEntry, const SyncFileItemPtr &item, const QString &originalPath, const PathTuple &path) const
+{
+    // Go from "cheap" to check up to "expensive" to check
+
+    if (!base.isValid()) {
+        qCInfo(lcDisco) << "Not a move, no item in db with inode" << localEntry.inode;
+        return false;
+    }
+
+    // Type changes (file->dir or vice-versa) are not moves
+    if (base.isDirectory() != item->isDirectory()) {
+        qCInfo(lcDisco) << "Not a move, types don't match" << base._type << item->_type << localEntry.type;
+        return false;
+    }
+
+    // Directories and virtual files don't need size/mtime equality
+    if (!localEntry.isDirectory && !base.isVirtualFile() && (base._modtime != localEntry.modtime || base._fileSize != localEntry.size)) {
+        qCInfo(lcDisco) << "Not a move, mtime or size differs, "
+                        << "modtime:" << base._modtime << localEntry.modtime << ", "
+                        << "size:" << base._fileSize << localEntry.size;
+        return false;
+    }
+
+    // If the old file still exists, it is not a move
+    if (QFile::exists(_discoveryData->_localDir + originalPath)) {
+        // However...:
+        if (
+            // Exception 1: If the rename only changes case (like "foo" -> "Foo"), the
+            // old filename might still point to the same file on a case-insensitive filesystem
+            !(Utility::fsCasePreservingButCaseInsensitive() && originalPath.compare(path._local, Qt::CaseInsensitive) == 0 && originalPath != path._local)
+            // Exception 2: normalization change
+            // Q: do I need that first equality check? Should we move that check up, as the condition above has the same check?
+            && !(
+                originalPath != path._local && originalPath.normalized(QString::NormalizationForm_C) == path._local.normalized(QString::NormalizationForm_C))) {
+            qCInfo(lcDisco) << "Not a move, base file still exists at" << originalPath;
+            return false;
+        }
+    }
+
+    // Verify the checksum where possible
+    if (!base._checksumHeader.isEmpty() && item->_type == ItemTypeFile && base._type == ItemTypeFile) {
+        if (computeLocalChecksum(base._checksumHeader, _discoveryData->_localDir + path._original, item)) {
+            qCInfo(lcDisco) << "checking checksum of potential rename " << path._original << item->_checksumHeader << base._checksumHeader;
+            if (item->_checksumHeader != base._checksumHeader) {
+                qCInfo(lcDisco) << "Not a move, checksums differ";
+                return false;
+            }
+        }
+        // I would expect that when a checksum computation is not possible, we should act conservative, and assume it's not a move, as it can have new data?
+        // else {
+        //     return false;
+        // }
+    }
+
+    // Shouldn't we move this up, as this check looks very cheap...?
+    if (_discoveryData->isRenamed(originalPath)) {
+        qCInfo(lcDisco) << "Not a move, base path already renamed";
+        return false;
+    }
+
+    return true;
+}
+
 void ProcessDirectoryJob::processFileAnalyzeLocalInfo(
     const SyncFileItemPtr &item, const PathTuple &path, const LocalInfo &localEntry,
     const RemoteInfo &serverEntry, const SyncJournalFileRecord &dbEntry, QueryMode recurseQueryServer)
@@ -785,58 +849,8 @@ void ProcessDirectoryJob::processFileAnalyzeLocalInfo(
     }
     const auto originalPath = QString::fromUtf8(base._path);
 
-    // Function to gradually check conditions for accepting a move-candidate
-    auto moveCheck = [&]() {
-        if (!base.isValid()) {
-            qCInfo(lcDisco) << "Not a move, no item in db with inode" << localEntry.inode;
-            return false;
-        }
-        if (base.isDirectory() != item->isDirectory()) {
-            qCInfo(lcDisco) << "Not a move, types don't match" << base._type << item->_type << localEntry.type;
-            return false;
-        }
-        // Directories and virtual files don't need size/mtime equality
-        if (!localEntry.isDirectory && !base.isVirtualFile()
-            && (base._modtime != localEntry.modtime || base._fileSize != localEntry.size)) {
-            qCInfo(lcDisco) << "Not a move, mtime or size differs, "
-                            << "modtime:" << base._modtime << localEntry.modtime << ", "
-                            << "size:" << base._fileSize << localEntry.size;
-            return false;
-        }
-
-        // The old file must have been deleted.
-        if (QFile::exists(_discoveryData->_localDir + originalPath)
-            // Exception: If the rename changes case only (like "foo" -> "Foo") the
-            // old filename might still point to the same file.
-            && !(Utility::fsCasePreserving() && originalPath.compare(path._local, Qt::CaseInsensitive) == 0 && originalPath != path._local)
-            // Exception: normalization change
-            && !(
-                originalPath != path._local && originalPath.normalized(QString::NormalizationForm_C) == path._local.normalized(QString::NormalizationForm_C))) {
-            qCInfo(lcDisco) << "Not a move, base file still exists at" << originalPath;
-            return false;
-        }
-
-        // Verify the checksum where possible
-        if (!base._checksumHeader.isEmpty() && item->_type == ItemTypeFile && base._type == ItemTypeFile) {
-            if (computeLocalChecksum(base._checksumHeader, _discoveryData->_localDir + path._original, item)) {
-                qCInfo(lcDisco) << "checking checksum of potential rename " << path._original << item->_checksumHeader << base._checksumHeader;
-                if (item->_checksumHeader != base._checksumHeader) {
-                    qCInfo(lcDisco) << "Not a move, checksums differ";
-                    return false;
-                }
-            }
-        }
-
-        if (_discoveryData->isRenamed(originalPath)) {
-            qCInfo(lcDisco) << "Not a move, base path already renamed";
-            return false;
-        }
-
-        return true;
-    };
-
     // If it's not a move it's just a local-NEW
-    if (!moveCheck()) {
+    if (!isMove(base, localEntry, item, originalPath, path)) {
         postProcessLocalNew(path);
         finalize(path, recurseQueryServer);
         return;

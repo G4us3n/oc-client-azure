@@ -154,6 +154,10 @@ private:
     /// processFile helper for when remote information is available, typically flows into AnalyzeLocalInfo when done
     void processFileAnalyzeRemoteInfo(const SyncFileItemPtr &item, PathTuple, const LocalInfo &, const RemoteInfo &, const SyncJournalFileRecord &);
 
+    // Function to gradually check conditions for accepting a move-candidate
+    bool isMove(
+        const SyncJournalFileRecord &base, const LocalInfo &localEntry, const SyncFileItemPtr &item, const QString &originalPath, const PathTuple &path) const;
+
     /// processFile helper for reconciling local changes
     void processFileAnalyzeLocalInfo(const SyncFileItemPtr &item, const PathTuple &, const LocalInfo &, const RemoteInfo &, const SyncJournalFileRecord &, QueryMode recurseQueryServer);
 

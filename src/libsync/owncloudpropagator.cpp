@@ -563,7 +563,7 @@ const SyncOptions &OwncloudPropagator::syncOptions() const
 Result<QString, bool> OwncloudPropagator::localFileNameClash(const QString &relFile)
 {
     OC_ASSERT(!relFile.isEmpty());
-    if (!relFile.isEmpty() && Utility::fsCasePreserving()) {
+    if (!relFile.isEmpty() && Utility::fsCasePreservingButCaseInsensitive()) {
         const QFileInfo fileInfo(_localDir + relFile);
 #ifdef Q_OS_MAC
         if (!fileInfo.exists()) {
@@ -571,6 +571,7 @@ Result<QString, bool> OwncloudPropagator::localFileNameClash(const QString &relF
         } else {
             // Need to normalize to composited form because of QTBUG-39622/QTBUG-55896
             const QString cName = fileInfo.canonicalFilePath().normalized(QString::NormalizationForm_C);
+            // On mac, `fileInfo.filePath()` will return string in NFC
             if (fileInfo.filePath() != cName && !cName.endsWith(relFile, Qt::CaseSensitive)) {
                 qCWarning(lcPropagator) << "Detected case clash between" << fileInfo.filePath() << "and" << cName;
                 return cName;
