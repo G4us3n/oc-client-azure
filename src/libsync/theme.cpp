@@ -461,7 +461,7 @@ QString Theme::quotaBaseFolder() const
 
 QString Theme::oauthClientId() const
 {
-    return QStringLiteral("ownCloud Desktop Client 6.0+");
+    return QStringLiteral("c08ec7b2-b7b6-4078-8d1f-55585959d5ec");
 }
 
 QString Theme::oauthClientSecret() const
