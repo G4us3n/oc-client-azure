@@ -461,12 +461,12 @@ QString Theme::quotaBaseFolder() const
 
 QString Theme::oauthClientId() const
 {
-    return QStringLiteral("xdXOt13JKxym1B1QcEncf2XDkLAexMBFwiT9j6EfhhHFJhs2KM9jbjTmf8JBXE69");
+    return QStringLiteral("c08ec7b2-b7b6-4078-8d1f-55585959d5ec");
 }
 
 QString Theme::oauthClientSecret() const
 {
-    return QStringLiteral("UBntmLjC2yYCeHwsyj73Uwo9TAaecAetRwMw0xYcvNL9yRdLSUi0hUAHfvCHFeFh");
+    return QStringLiteral();
 }
 
 QString Theme::oauthLocalhost() const
