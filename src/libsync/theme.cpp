@@ -487,12 +487,12 @@ QVector<quint16> Theme::oauthPorts() const
 
 QString Theme::openIdConnectScopes() const
 {
-    return QStringLiteral("openid offline_access email profile");
+    return QStringLiteral("openid offline_access email profile api://3d9fbba2-4e91-4ac8-b386-be73eb5c908f/user_impersonation");
 }
 
 QString Theme::openIdConnectPrompt() const
 {
-    return QStringLiteral("select_account consent");
+    return QStringLiteral("select_account");
 }
 
 bool Theme::oidcEnableDynamicRegistration() const
