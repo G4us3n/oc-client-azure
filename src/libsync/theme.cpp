@@ -27,12 +27,50 @@
 #include <QStyle>
 #include <QtCore>
 #include <QtGui>
+// Aggiunta per leggere il registro
+#include <QSettings> 
 
 #include "themewatcher.h"
 
 #ifdef THEME_INCLUDE
 #include THEME_INCLUDE
 #endif
+
+// --- INIZIO MODIFICA GPO HELPER ---
+#ifdef Q_OS_WIN
+namespace {
+// Percorsi delle chiavi di registro per le Policy
+static const QString kRegistryPathMachine = QStringLiteral("HKEY_LOCAL_MACHINE\\Software\\Policies\\bitCorp\\ownCloud");
+static const QString kRegistryPathUser = QStringLiteral("HKEY_CURRENT_USER\\Software\\Policies\\bitCorp\\ownCloud");
+
+// Helper per leggere stringhe: Prima HKLM, poi HKCU, poi vuoto
+static QString getRegistryString(const QString &key)
+{
+    QSettings hklm(kRegistryPathMachine, QSettings::NativeFormat);
+    QString value = hklm.value(key).toString();
+    if (!value.isEmpty()) return value;
+
+    QSettings hkcu(kRegistryPathUser, QSettings::NativeFormat);
+    value = hkcu.value(key).toString();
+    if (!value.isEmpty()) return value;
+
+    return QString();
+}
+
+// Helper per leggere booleani: Ritorna -1 se non settato, 0 falso, 1 vero
+static int getRegistryBool(const QString &key)
+{
+    QSettings hklm(kRegistryPathMachine, QSettings::NativeFormat);
+    if (hklm.contains(key)) return hklm.value(key).toBool() ? 1 : 0;
+
+    QSettings hkcu(kRegistryPathUser, QSettings::NativeFormat);
+    if (hkcu.contains(key)) return hkcu.value(key).toBool() ? 1 : 0;
+
+    return -1; // Non configurato
+}
+}
+#endif
+// --- FINE MODIFICA GPO HELPER ---
 
 namespace {
 QString whiteTheme()
@@ -64,7 +102,7 @@ QmlUrlButton::QmlUrlButton() { }
 QmlUrlButton::QmlUrlButton(const std::tuple<QString, QString, QUrl> &tuple)
     : icon(QStringLiteral("urlIcons/%1").arg(std::get<0>(tuple)))
     , name(std::get<1>(tuple))
-    , url(std::get<2>(tuple))
+    , url(std::get(tuple))
 {
 }
 
@@ -96,11 +134,19 @@ Theme::~Theme()
 
 QString Theme::appNameGUI() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("AppNameGUI"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral(APPLICATION_NAME);
 }
 
 QString Theme::appName() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("AppName"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral(APPLICATION_SHORTNAME);
 }
 
@@ -116,6 +162,10 @@ QString Theme::orgDomainName() const
 
 QString Theme::vendor() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("Vendor"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral(APPLICATION_VENDOR);
 }
 
@@ -186,21 +236,37 @@ QList<QmlUrlButton> Theme::qmlUrlButtons() const
 // The Add-Button is removed accordingly.
 bool Theme::singleSyncFolder() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("SingleSyncFolder"));
+    if (reg != -1) return reg == 1;
+#endif
     return false;
 }
 
 bool Theme::multiAccount() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("MultiAccount"));
+    if (reg != -1) return reg == 1;
+#endif
     return true;
 }
 
 QString Theme::defaultServerFolder() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("DefaultServerFolder"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral("/");
 }
 
 QString Theme::helpUrl() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("HelpUrl"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral("https://doc.owncloud.com/desktop/latest/");
 }
 
@@ -221,6 +287,13 @@ QString Theme::overrideServerUrl() const
 
 QString Theme::overrideServerUrlV2() const
 {
+#ifdef Q_OS_WIN
+    // 1. Check GPO (HKLM then HKCU)
+    QString reg = getRegistryString(QStringLiteral("OverrideServerUrl"));
+    if (!reg.isEmpty()) return reg;
+#endif
+
+    // 2. Check Environment Variable
     static const auto serverOverride = qEnvironmentVariable("OWNCLOUD_OVERRIDE_SERVER_URL");
     if (serverOverride.isEmpty()) {
         OC_DISABLE_DEPRECATED_WARNING
@@ -232,6 +305,10 @@ QString Theme::overrideServerUrlV2() const
 
 QString Theme::overrideServerPath() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("OverrideServerPath"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return {};
 }
 
@@ -243,6 +320,11 @@ void Theme::setSystrayUseMonoIcons(bool mono)
 
 QUrl Theme::updateCheckUrl() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("UpdateCheckUrl"));
+    if (!reg.isEmpty()) return QUrl(reg);
+#endif
+
 #ifndef APPLICATION_UPDATE_URL
     return QUrl(QString());
 #else
@@ -252,6 +334,10 @@ QUrl Theme::updateCheckUrl() const
 
 bool Theme::wizardSkipAdvancedPage() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("WizardSkipAdvancedPage"));
+    if (reg != -1) return reg == 1;
+#endif
     return false;
 }
 
@@ -415,21 +501,37 @@ QColor Theme::avatarColorChecked() const
 
 QString Theme::webDavPath() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("WebDavPath"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral("remote.php/webdav/");
 }
 
 bool Theme::linkSharing() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("LinkSharing"));
+    if (reg != -1) return reg == 1;
+#endif
     return true;
 }
 
 bool Theme::userGroupSharing() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("UserGroupSharing"));
+    if (reg != -1) return reg == 1;
+#endif
     return true;
 }
 
 bool Theme::forceSystemNetworkProxy() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("ForceSystemNetworkProxy"));
+    if (reg != -1) return reg == 1;
+#endif
     return false;
 }
 
@@ -440,11 +542,19 @@ Theme::UserIDType Theme::userIDType() const
 
 QString Theme::customUserID() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("CustomUserID"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QString();
 }
 
 QString Theme::userIDHint() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("UserIDHint"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QString();
 }
 
@@ -456,21 +566,37 @@ QString Theme::wizardUrlPostfix() const
 
 QString Theme::quotaBaseFolder() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("QuotaBaseFolder"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral("/");
 }
 
 QString Theme::oauthClientId() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("OAuthClientId"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral("c08ec7b2-b7b6-4078-8d1f-55585959d5ec");
 }
 
 QString Theme::oauthClientSecret() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("OAuthClientSecret"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral();
 }
 
 QString Theme::oauthLocalhost() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("OAuthLocalhost"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral("http://localhost");
 }
 
@@ -487,16 +613,28 @@ QVector<quint16> Theme::oauthPorts() const
 
 QString Theme::openIdConnectScopes() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("OpenIdConnectScopes"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral("openid offline_access email profile api://3d9fbba2-4e91-4ac8-b386-be73eb5c908f/user_impersonation");
 }
 
 QString Theme::openIdConnectPrompt() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("OpenIdConnectPrompt"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral("select_account");
 }
 
 bool Theme::oidcEnableDynamicRegistration() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("OidcEnableDynamicRegistration"));
+    if (reg != -1) return reg == 1;
+#endif
     return true;
 }
 
@@ -507,36 +645,64 @@ QString Theme::versionSwitchOutput() const
 
 bool Theme::showVirtualFilesOption() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("ShowVirtualFilesOption"));
+    if (reg != -1) return reg == 1;
+#endif
     return true;
 }
 
 bool Theme::forceVirtualFilesOption() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("ForceVirtualFilesOption"));
+    if (reg != -1) return reg == 1;
+#endif
     return false;
 }
 
 bool Theme::connectionValidatorClearCookies() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("ConnectionValidatorClearCookies"));
+    if (reg != -1) return reg == 1;
+#endif
     return false;
 }
 
 bool Theme::enableSocketApiIconSupport() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("EnableSocketApiIconSupport"));
+    if (reg != -1) return reg == 1;
+#endif
     return true;
 }
 
 bool Theme::warnOnMultipleDb() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("WarnOnMultipleDb"));
+    if (reg != -1) return reg == 1;
+#endif
     return Resources::isVanillaTheme();
 }
 
 bool Theme::allowDuplicatedFolderSyncPair() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("AllowDuplicatedFolderSyncPair"));
+    if (reg != -1) return reg == 1;
+#endif
     return true;
 }
 
 bool Theme::wizardEnableWebfinger() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("WizardEnableWebfinger"));
+    if (reg != -1) return reg == 1;
+#endif
     return false;
 }
 
@@ -547,21 +713,37 @@ QVector<std::tuple<QString, QString, QUrl>> Theme::urlButtons() const
 
 bool Theme::enableMoveToTrash() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("EnableMoveToTrash"));
+    if (reg != -1) return reg == 1;
+#endif
     return true;
 }
 
 bool Theme::syncNewlyDiscoveredSpaces() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("SyncNewlyDiscoveredSpaces"));
+    if (reg != -1) return reg == 1;
+#endif
     return false;
 }
 
 bool Theme::enableCernBranding() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("EnableCernBranding"));
+    if (reg != -1) return reg == 1;
+#endif
     return false;
 }
 
 bool Theme::spacesAreCalledFolders() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("SpacesAreCalledFolders"));
+    if (reg != -1) return reg == 1;
+#endif
     return false;
 }
 
