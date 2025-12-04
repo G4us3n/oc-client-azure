@@ -28,7 +28,7 @@
 #include <QtCore>
 #include <QtGui>
 // Aggiunta per leggere il registro
-#include <QSettings> 
+#include <QSettings>
 
 #include "themewatcher.h"
 
@@ -102,7 +102,7 @@ QmlUrlButton::QmlUrlButton() { }
 QmlUrlButton::QmlUrlButton(const std::tuple<QString, QString, QUrl> &tuple)
     : icon(QStringLiteral("urlIcons/%1").arg(std::get<0>(tuple)))
     , name(std::get<1>(tuple))
-    , url(std::get(tuple))
+    , url(std::get<2>(tuple))
 {
 }
 
