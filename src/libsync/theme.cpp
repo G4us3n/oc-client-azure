@@ -152,11 +152,19 @@ QString Theme::appName() const
 
 QString Theme::appDotVirtualFileSuffix() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("AppDotVirtualFileSuffix"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral(APPLICATION_DOTVIRTUALFILE_SUFFIX);
 }
 
 QString Theme::orgDomainName() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("OrgDomainName"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral(APPLICATION_REV_DOMAIN);
 }
 
@@ -171,6 +179,10 @@ QString Theme::vendor() const
 
 QString Theme::configFileName() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("ConfigFileName"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral(APPLICATION_EXECUTABLE ".cfg");
 }
 
@@ -181,6 +193,10 @@ QIcon Theme::applicationIcon() const
 
 QString Theme::applicationIconName() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("ApplicationIconName"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QStringLiteral(APPLICATION_ICON_NAME);
 }
 
@@ -427,6 +443,10 @@ QString Theme::about() const
 
 bool Theme::aboutShowCopyright() const
 {
+#ifdef Q_OS_WIN
+    int reg = getRegistryBool(QStringLiteral("AboutShowCopyright"));
+    if (reg != -1) return reg == 1;
+#endif
     return true;
 }
 
@@ -466,16 +486,32 @@ QString Theme::syncStateIconName(const SyncResult &result) const
 
 QColor Theme::wizardHeaderTitleColor() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("WizardHeaderTitleColor"));
+    if (!reg.isEmpty()) {
+        QColor col(reg);
+        if (col.isValid()) return col;
+    }
+#endif
     return qApp->palette().text().color();
 }
 
 QColor Theme::wizardHeaderBackgroundColor() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("WizardHeaderBackgroundColor"));
+    if (!reg.isEmpty()) {
+        QColor col(reg);
+        if (col.isValid()) return col;
+    }
+#endif
     return QColor();
 }
 
 QmlButtonColor Theme::primaryButtonColor() const
 {
+    // Nota: QmlButtonColor è complesso (3 colori), non mappato nel registro semplice.
+    // Richiederebbe 3 chiavi separate.
     return {};
 }
 
@@ -491,11 +527,25 @@ QIcon Theme::wizardHeaderLogo() const
 
 QColor Theme::avatarColor() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("AvatarColor"));
+    if (!reg.isEmpty()) {
+        QColor col(reg);
+        if (col.isValid()) return col;
+    }
+#endif
     return {};
 }
 
 QColor Theme::avatarColorChecked() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("AvatarColorChecked"));
+    if (!reg.isEmpty()) {
+        QColor col(reg);
+        if (col.isValid()) return col;
+    }
+#endif
     return {};
 }
 
@@ -537,6 +587,15 @@ bool Theme::forceSystemNetworkProxy() const
 
 Theme::UserIDType Theme::userIDType() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("UserIDType"));
+    if (!reg.isEmpty()) {
+        // Mappatura semplice da stringa a Enum
+        if (reg.compare(QStringLiteral("UserName"), Qt::CaseInsensitive) == 0) return UserIDType::UserIDUserName;
+        if (reg.compare(QStringLiteral("Email"), Qt::CaseInsensitive) == 0) return UserIDType::UserIDEmail;
+        if (reg.compare(QStringLiteral("Custom"), Qt::CaseInsensitive) == 0) return UserIDType::UserIDCustom;
+    }
+#endif
     return UserIDType::UserIDUserName;
 }
 
@@ -561,6 +620,10 @@ QString Theme::userIDHint() const
 
 QString Theme::wizardUrlPostfix() const
 {
+#ifdef Q_OS_WIN
+    QString reg = getRegistryString(QStringLiteral("WizardUrlPostfix"));
+    if (!reg.isEmpty()) return reg;
+#endif
     return QString();
 }
 
@@ -772,3 +835,5 @@ OWNCLOUDSYNC_EXPORT QString Utility::enumToDisplayName(Theme::UserIDType userIdT
 }
 
 } // end namespace client
+
+}
