@@ -835,5 +835,3 @@ OWNCLOUDSYNC_EXPORT QString Utility::enumToDisplayName(Theme::UserIDType userIdT
 }
 
 } // end namespace client
-
-}
