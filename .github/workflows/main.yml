@@ -34,16 +34,21 @@ jobs:
               container:
               useSonarCloud: ${{ github.event_name != 'pull_request' }}
             # TODO: align the target with the name
-            - name: macos-clang-arm64
-              target: macos-clang-arm64
-              os: macos-latest
-              container:
-              useSonarCloud:
-            - name: linux-gcc-x86_64
-              target: linux-64-gcc
-              os: ubuntu-latest
-              container: owncloudci/appimage-build:sles15-amd64
-              useSonarCloud:
+            #- name: macos-clang-arm64
+            #  target: macos-clang-arm64
+            #  os: macos-latest
+            #  container:
+            #  useSonarCloud:
+            #- name: macos-clang-arm64-debug
+            #  target: macos-clang-arm64-debug
+            #  os: macos-latest
+            #  container:
+            #  useSonarCloud:
+            #- name: linux-gcc-x86_64
+            #  target: linux-64-gcc
+            #  os: ubuntu-latest
+            #  container: owncloudci/appimage-build:sles15-amd64
+            #  useSonarCloud:
     name: ${{ matrix.name }}
 
     runs-on: ${{ matrix.os }}
@@ -135,6 +140,12 @@ jobs:
     - name: Build
       if: ${{ !matrix.useSonarCloud }}
       run: |
+        if ("${{ matrix.target }}" -eq "macos-64-clang-debug" ) {
+            # https://api.kde.org/ecm/module/ECMEnableSanitizers.html
+            # address;leak;undefined
+            # clang: error: unsupported option '-fsanitize=leak' for target 'x86_64-apple-darwin21.6.0'
+            & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --set args="-DECM_ENABLE_SANITIZERS='address;undefined'" owncloud/owncloud-client
+        }
         if ("${{ matrix.target }}" -eq "linux-64-gcc" ) {
             # build with appimage updater and others
             & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --set enableAppImageUpdater=true owncloud-client
@@ -155,6 +166,15 @@ jobs:
     - name: Run tests
       run: |
         & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --no-cache --test owncloud/owncloud-client
+
+    - name: Clang tidy
+      if: github.event_name != 'pull_request'
+      run: |
+        & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c libs/llvm python-modules/pip
+        & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --run python3 -m pip install clang-html
+        $env:BUILD_DIR = $(& "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --get buildDir -q owncloud-client)
+        & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --run pwsh "${env:GITHUB_WORKSPACE}/.github/workflows/.run-clang-tidy.ps1"
+        & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --run python3 -m clang_html "${env:TMPDIR}/clang-tidy.log" -o "${env:GITHUB_WORKSPACE}/binaries/clang-tidy.html"
 
     - name: Package
       run: |
